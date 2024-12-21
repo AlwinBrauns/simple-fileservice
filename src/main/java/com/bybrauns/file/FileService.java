@@ -9,7 +9,6 @@ import org.springframework.util.FileSystemUtils;
 import org.springframework.util.StringUtils;
 import org.springframework.web.context.annotation.ApplicationScope;
 import org.springframework.web.multipart.MultipartFile;
-import org.springframework.web.util.ServletRequestPathUtils;
 
 import java.io.IOException;
 import java.net.MalformedURLException;
