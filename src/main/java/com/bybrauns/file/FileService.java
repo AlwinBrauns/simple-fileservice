@@ -1,6 +1,10 @@
 package com.bybrauns.file;
 
+import com.bybrauns.file.filetracking.FileTracking;
+import com.bybrauns.file.filetracking.FileTrackingRepository;
 import jakarta.annotation.PostConstruct;
+import jakarta.transaction.Transactional;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.UrlResource;
@@ -15,6 +19,7 @@ import java.net.MalformedURLException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.time.Instant;
 import java.util.Objects;
 import java.util.stream.Stream;
 
@@ -24,7 +29,13 @@ public class FileService {
 
     @Value("${files.path}")
     private String filesPath;
+    private final FileTrackingRepository fileTrackingRepository;
     Path files;
+
+    @Autowired
+    public FileService(FileTrackingRepository fileTrackingRepository) {
+        this.fileTrackingRepository = fileTrackingRepository;
+    }
 
     @PostConstruct
     public void init() {
@@ -36,15 +47,45 @@ public class FileService {
         }
     }
 
+    @Transactional
     public void save(MultipartFile file) {
         try {
-            Files.copy(file.getInputStream(), this.files.resolve(
-                    Objects.requireNonNull(file.getOriginalFilename()))
-            );
-        } catch (Exception e) {
+            final var fileSearch = fileTrackingRepository.findFirstByFileName(file.getOriginalFilename());
+            if(fileSearch.isPresent() && !fileSearch.get().isDeleted()) throw new RuntimeException("File already exists!");
+            if(fileSearch.isPresent()) {
+                saveOnceDeletedFile(file, fileSearch.get());
+            } else {
+                saveFile(file);
+            }
+        } catch (IOException e) {
             throw new RuntimeException(e.getMessage());
         }
     }
+
+    private void saveFile(MultipartFile file) throws IOException {
+        final var fileTracking = new FileTracking();
+        saveFileAndSaveTracking(file, fileTracking);
+    }
+
+    private void saveOnceDeletedFile(MultipartFile file, FileTracking fileSearch) throws IOException {
+        saveFileAndSaveTracking(file, fileSearch);
+    }
+
+    private void saveFileAndSaveTracking(MultipartFile file, FileTracking fileTracking) throws IOException {
+        fileTracking.setFileName(file.getOriginalFilename());
+        fileTracking.setFilePath(Paths.get(filesPath, file.getOriginalFilename()).toString());
+        fileTracking.setFileSize(String.valueOf(file.getSize()));
+        fileTracking.setFileType(file.getContentType());
+        fileTracking.setTimestamp(Instant.now());
+        fileTracking.setDeleted(false);
+
+        Files.copy(file.getInputStream(), this.files.resolve(
+                Objects.requireNonNull(file.getOriginalFilename()))
+        );
+
+        fileTrackingRepository.save(fileTracking);
+    }
+
 
     public Resource load(String filename) {
         try {
