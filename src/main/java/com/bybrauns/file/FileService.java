@@ -90,7 +90,11 @@ public class FileService {
     public Resource load(String filename) {
         try {
             filename = StringUtils.cleanPath(filename);
-            Path file = files.resolve("%s/%s".formatted(filesPath, filename)).normalize();
+            final var fileSearch = fileTrackingRepository.findFirstByFileName(filename);
+            if(fileSearch.isEmpty()) throw new RuntimeException("File not found!");
+            if(fileSearch.get().isDeleted()) throw new RuntimeException("File already deleted!");
+            final var fileFromTracking = fileSearch.get();
+            Path file = files.resolve("%s/%s".formatted(filesPath, fileFromTracking.getFileName())).normalize();
             Resource resource = new UrlResource(file.toUri());
 
             if (resource.exists() || resource.isReadable()) {
