@@ -31,6 +31,18 @@ public class FileController {
         fileService.save(file);
     }
 
+    @ResponseStatus(HttpStatus.OK)
+    @DeleteMapping("public/file")
+    //@PreAuthorize("hasAnyRole('user', 'maintainer')")
+    public void filedeletion(@RequestParam String filename, @RequestParam(required = false) boolean instant) {
+        log.info("Deleting: {}", filename);
+        if (instant) {
+            fileService.delete(filename);
+        } else {
+            fileService.markAsReadyForDeletion(filename);
+        }
+    }
+
     @GetMapping("public/file")
     //@PreAuthorize("hasAnyRole('user', 'maintainer')")
     public void filedownload(HttpServletResponse response, @RequestParam String filename) {

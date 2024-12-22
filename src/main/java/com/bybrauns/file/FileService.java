@@ -1,5 +1,7 @@
 package com.bybrauns.file;
 
+import com.bybrauns.file.filetracking.FileForDeletion;
+import com.bybrauns.file.filetracking.FileForDeletionRepository;
 import com.bybrauns.file.filetracking.FileTracking;
 import com.bybrauns.file.filetracking.FileTrackingRepository;
 import jakarta.annotation.PostConstruct;
@@ -29,9 +31,11 @@ import java.util.stream.Stream;
 @RequiredArgsConstructor
 public class FileService {
 
+    private final FileForDeletionRepository fileForDeletionRepository;
     @Value("${files.path}")
     private String filesPath;
     private final FileTrackingRepository fileTrackingRepository;
+    private final FileForDeletionRepository forDeletionRepository;
     Path files;
 
     @PostConstruct
@@ -55,32 +59,10 @@ public class FileService {
         }
     }
 
-    private void saveFile(MultipartFile file) throws IOException {
-        final var fileTracking = new FileTracking();
-        saveFileAndSaveTracking(file, fileTracking);
-    }
-
-    private void saveFileAndSaveTracking(MultipartFile file, FileTracking fileTracking) throws IOException {
-        fileTracking.setFileName(file.getOriginalFilename());
-        fileTracking.setFilePath(Paths.get(filesPath, file.getOriginalFilename()).toString());
-        fileTracking.setFileSize(String.valueOf(file.getSize()));
-        fileTracking.setFileType(file.getContentType());
-        fileTracking.setTimestamp(Instant.now());
-
-        Files.copy(file.getInputStream(), this.files.resolve(
-                Objects.requireNonNull(file.getOriginalFilename()))
-        );
-
-        fileTrackingRepository.save(fileTracking);
-    }
-
-
     public Resource load(String filename) {
         try {
             filename = StringUtils.cleanPath(filename);
-            final var fileSearch = fileTrackingRepository.findFirstByFileName(filename);
-            if(fileSearch.isEmpty()) throw new RuntimeException("File not found!");
-            final var fileFromTracking = fileSearch.get();
+            final var fileFromTracking = getFileTracking(filename);
             Path file = files.resolve("%s/%s".formatted(filesPath, fileFromTracking.getFileName())).normalize();
             Resource resource = new UrlResource(file.toUri());
 
@@ -94,25 +76,51 @@ public class FileService {
         }
     }
 
+    public void markAsReadyForDeletion(String filename) {
+        final var fileFromTracking = getFileTracking(filename);
+        if(fileForDeletionRepository.findFirstByFileTracking(fileFromTracking).isPresent())
+            throw new RuntimeException("File already marked for deletion!");
+        fileForDeletionRepository.save(
+                FileForDeletion.builder()
+                        .fileTracking(fileFromTracking)
+                        .timestamp(Instant.now())
+                .build()
+        );
+    }
+
     public boolean delete(String filename) {
         try {
-            Path file = files.resolve(filename);
+            final var fileFromTracking = getFileTracking(filename);
+            Path file = files.resolve(fileFromTracking.getFileName()).normalize();
             return Files.deleteIfExists(file);
         } catch (IOException e) {
             throw new RuntimeException("Error: " + e.getMessage());
         }
     }
 
-    public void deleteAll() {
-        FileSystemUtils.deleteRecursively(files.toFile());
+    private FileTracking getFileTracking(String filename) {
+        final var fileSearch = fileTrackingRepository.findFirstByFileName(filename);
+        if(fileSearch.isEmpty()) throw new RuntimeException("File not found!");
+        return fileSearch.get();
     }
 
-    public Stream<Path> loadAll() {
-        try (Stream<Path> stream = Files.walk(files, 1).filter(path -> !path.equals(files))) {
-            return stream.map(files::relativize);
-        } catch (IOException e) {
-            throw new RuntimeException("Could not load the files!");
-        }
+    private void saveFile(MultipartFile file) throws IOException {
+        final var fileTracking = new FileTracking();
+        saveFileAndSaveTracking(file, fileTracking);
     }
 
+    private void saveFileAndSaveTracking(MultipartFile file, FileTracking fileTracking) throws IOException {
+        final var filename = StringUtils.cleanPath(Objects.requireNonNull(file.getOriginalFilename()));
+        fileTracking.setFileName(file.getOriginalFilename());
+        fileTracking.setFilePath(Paths.get(filesPath, filename).normalize().toString());
+        fileTracking.setFileSize(String.valueOf(file.getSize()));
+        fileTracking.setFileType(file.getContentType());
+        fileTracking.setTimestamp(Instant.now());
+
+        Files.copy(file.getInputStream(), this.files.resolve(
+                Objects.requireNonNull(file.getOriginalFilename()))
+        );
+
+        fileTrackingRepository.save(fileTracking);
+    }
 }
