@@ -4,6 +4,7 @@ import com.bybrauns.file.filetracking.FileTracking;
 import com.bybrauns.file.filetracking.FileTrackingRepository;
 import jakarta.annotation.PostConstruct;
 import jakarta.transaction.Transactional;
+import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.Resource;
@@ -25,17 +26,13 @@ import java.util.stream.Stream;
 
 @Component
 @ApplicationScope
+@RequiredArgsConstructor
 public class FileService {
 
     @Value("${files.path}")
     private String filesPath;
     private final FileTrackingRepository fileTrackingRepository;
     Path files;
-
-    @Autowired
-    public FileService(FileTrackingRepository fileTrackingRepository) {
-        this.fileTrackingRepository = fileTrackingRepository;
-    }
 
     @PostConstruct
     public void init() {
@@ -51,12 +48,8 @@ public class FileService {
     public void save(MultipartFile file) {
         try {
             final var fileSearch = fileTrackingRepository.findFirstByFileName(file.getOriginalFilename());
-            if(fileSearch.isPresent() && !fileSearch.get().isDeleted()) throw new RuntimeException("File already exists!");
-            if(fileSearch.isPresent()) {
-                saveOnceDeletedFile(file, fileSearch.get());
-            } else {
-                saveFile(file);
-            }
+            if(fileSearch.isPresent()) throw new RuntimeException("File already exists!");
+            saveFile(file);
         } catch (IOException e) {
             throw new RuntimeException(e.getMessage());
         }
@@ -67,17 +60,12 @@ public class FileService {
         saveFileAndSaveTracking(file, fileTracking);
     }
 
-    private void saveOnceDeletedFile(MultipartFile file, FileTracking fileSearch) throws IOException {
-        saveFileAndSaveTracking(file, fileSearch);
-    }
-
     private void saveFileAndSaveTracking(MultipartFile file, FileTracking fileTracking) throws IOException {
         fileTracking.setFileName(file.getOriginalFilename());
         fileTracking.setFilePath(Paths.get(filesPath, file.getOriginalFilename()).toString());
         fileTracking.setFileSize(String.valueOf(file.getSize()));
         fileTracking.setFileType(file.getContentType());
         fileTracking.setTimestamp(Instant.now());
-        fileTracking.setDeleted(false);
 
         Files.copy(file.getInputStream(), this.files.resolve(
                 Objects.requireNonNull(file.getOriginalFilename()))
@@ -92,7 +80,6 @@ public class FileService {
             filename = StringUtils.cleanPath(filename);
             final var fileSearch = fileTrackingRepository.findFirstByFileName(filename);
             if(fileSearch.isEmpty()) throw new RuntimeException("File not found!");
-            if(fileSearch.get().isDeleted()) throw new RuntimeException("File already deleted!");
             final var fileFromTracking = fileSearch.get();
             Path file = files.resolve("%s/%s".formatted(filesPath, fileFromTracking.getFileName())).normalize();
             Resource resource = new UrlResource(file.toUri());

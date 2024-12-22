@@ -2,6 +2,8 @@ package com.bybrauns.file;
 
 import jakarta.servlet.ServletOutputStream;
 import jakarta.servlet.http.HttpServletResponse;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.Resource;
 import org.springframework.http.HttpHeaders;
@@ -15,15 +17,11 @@ import java.io.InputStream;
 import java.net.URLConnection;
 
 @RestController
+@Slf4j
+@RequiredArgsConstructor
 public class FileController {
 
     private final FileService fileService;
-    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(FileController.class);
-
-    @Autowired
-    FileController(FileService fileService) {
-        this.fileService = fileService;
-    }
 
     @ResponseStatus(HttpStatus.CREATED)
     @PostMapping("file")
