@@ -46,19 +46,13 @@ public class FileService {
     }
 
     public FileTracking save(MultipartFile file) {
-        try {
-            final var fileSearch = fileTrackingRepository.findFirstByFileName(file.getOriginalFilename());
-            if(fileSearch.isPresent()) throw new RuntimeException("File already exists!");
-            return saveFile(file);
-        } catch (IOException e) {
-            throw new RuntimeException(e.getMessage());
-        }
+        return fileTrackingService.save(file, filesPath, files);
     }
 
     public Resource load(String filename) {
         try {
             filename = StringUtils.cleanPath(filename);
-            final var fileFromTracking = getFileTracking(filename);
+            final var fileFromTracking = fileTrackingService.getFileTracking(filename);
             Path file = files.resolve("%s/%s".formatted(filesPath, fileFromTracking.getFileName())).normalize();
             Resource resource = new UrlResource(file.toUri());
 
@@ -73,7 +67,7 @@ public class FileService {
     }
 
     public void markAsReadyForDeletion(String filename) {
-        final var fileFromTracking = getFileTracking(filename);
+        final var fileFromTracking = fileTrackingService.getFileTracking(filename);
         if(fileForDeletionRepository.findFirstByFileTracking(fileFromTracking).isPresent())
             throw new RuntimeException("File already marked for deletion!");
         fileForDeletionRepository.save(
@@ -84,40 +78,16 @@ public class FileService {
         );
     }
 
-    public boolean delete(String filename) {
-        try {
-            final var fileFromTracking = getFileTracking(filename);
-            Path file = files.resolve(fileFromTracking.getFileName()).normalize();
-            final var gotDeleted = Files.deleteIfExists(file);
-            if(gotDeleted) {
-                fileTrackingRepository.delete(fileFromTracking);
-                thumbnailService.deleteThumbnail(fileFromTracking);
-            }
-            log.info("File deleted: {}", fileFromTracking.getFileName());
-            return gotDeleted;
-        } catch (IOException e) {
-            throw new RuntimeException("Error: " + e.getMessage());
-        }
-    }
-
     public void deleteAllMarkedForDeletion() {
         final var allMarkedForDeletions = fileForDeletionRepository.findAll();
         allMarkedForDeletions.forEach(markAsReadyForDeletion -> {
-            if(delete(markAsReadyForDeletion.getFileTracking().getFileName())) {
+            if(fileTrackingService.delete(markAsReadyForDeletion.getFileTracking().getFileName(), files)) {
                 fileForDeletionRepository.delete(markAsReadyForDeletion);
             }
         });
     }
 
-    private FileTracking getFileTracking(String filename) {
-        final var fileSearch = fileTrackingRepository.findFirstByFileName(filename);
-        if(fileSearch.isEmpty()) throw new RuntimeException("File not found!");
-        return fileSearch.get();
+    public boolean delete(String filename) {
+        return fileTrackingService.delete(filename, files);
     }
-
-    private FileTracking saveFile(MultipartFile file) throws IOException {
-        final var fileTracking = new FileTracking();
-        return fileTrackingService.saveFileAndSaveTracking(file, fileTracking, filesPath, files);
-    }
-
 }

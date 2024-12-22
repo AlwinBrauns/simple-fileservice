@@ -47,7 +47,7 @@ public class ThumbnailService {
     public Resource load(String filename) {
         try {
             filename = StringUtils.cleanPath(filename);
-            final var fileFromTracking = getFileTracking(filename);
+            final var fileFromTracking = fileTrackingService.getFileTracking(filename);
             final var thumbnail = fileThumbnailRepository.findFirstByForFile(fileFromTracking).orElseThrow();
             Path file = files.resolve("%s/%s".formatted(thumbnailsPath, thumbnail.getThumbnail().getFileName())).normalize();
             Resource resource = new UrlResource(file.toUri());
@@ -62,13 +62,7 @@ public class ThumbnailService {
         }
     }
 
-    private FileTracking getFileTracking(String filename) {
-        final var fileSearch = fileTrackingRepository.findFirstByFileName(filename);
-        if(fileSearch.isEmpty()) throw new RuntimeException("File not found!");
-        return fileSearch.get();
-    }
-
-    public void saveThumbnail(MultipartFile thumbnail, FileTracking forFile) {
+    public void save(MultipartFile thumbnail, FileTracking forFile) {
         if(!Objects.requireNonNull(thumbnail.getContentType()).startsWith("image")) throw new RuntimeException("Thumbnail must be an image!");
         fileThumbnailRepository.save(FileThumbnail.builder()
                 .thumbnail(save(thumbnail))
@@ -77,24 +71,17 @@ public class ThumbnailService {
         );
     }
 
-    public FileTracking save(MultipartFile file) {
-        try {
-            final var fileSearch = fileTrackingRepository.findFirstByFileName(file.getOriginalFilename());
-            if(fileSearch.isPresent()) throw new RuntimeException("File already exists!");
-            return saveThumbnailFile(file);
-        } catch (IOException e) {
-            throw new RuntimeException(e.getMessage());
-        }
+    private FileTracking save(MultipartFile file) {
+        return fileTrackingService.save(file, thumbnailsPath, files);
     }
 
     public void deleteThumbnail(FileTracking fileFromTracking) {
         final var thumbnail = fileThumbnailRepository.findFirstByForFile(fileFromTracking);
-        thumbnail.ifPresent(fileThumbnailRepository::delete);
-    }
-
-    private FileTracking saveThumbnailFile(MultipartFile file) throws IOException {
-        final var fileTracking = new FileTracking();
-        return fileTrackingService.saveFileAndSaveTracking(file, fileTracking, thumbnailsPath, files);
+        thumbnail.ifPresent(_thumbnail -> {
+            if(fileTrackingService.delete(_thumbnail.getThumbnail().getFileName(), files)) {
+                fileThumbnailRepository.delete(_thumbnail);
+            }
+        });
     }
 
 }

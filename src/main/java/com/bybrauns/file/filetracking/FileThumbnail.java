@@ -3,8 +3,6 @@ package com.bybrauns.file.filetracking;
 
 import jakarta.persistence.*;
 import lombok.*;
-import org.hibernate.annotations.Cascade;
-import org.hibernate.annotations.CascadeType;
 
 @Entity
 @Getter
@@ -19,7 +17,6 @@ public class FileThumbnail {
 
     @ManyToOne
     @JoinColumn(name = "thumbnail_id")
-    @Cascade(CascadeType.DELETE_ORPHAN)
     FileTracking thumbnail;
     @ManyToOne
     @JoinColumn(name = "forfile_id")

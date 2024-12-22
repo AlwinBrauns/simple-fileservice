@@ -30,7 +30,7 @@ public class FileController {
         log.info("Upload: {}", file.getOriginalFilename());
         final var savedFile = fileService.save(file);
         if(thumbnail != null) {
-            thumbnailService.saveThumbnail(thumbnail, savedFile);
+            thumbnailService.save(thumbnail, savedFile);
         }
     }
 
@@ -55,8 +55,17 @@ public class FileController {
     @GetMapping("public/file")
     //@PreAuthorize("hasAnyRole('user', 'maintainer')")
     public void filedownload(HttpServletResponse response, @RequestParam String filename) {
+        loadFile(response, filename, fileService.load(filename));
+    }
+
+    @GetMapping("public/thumbnail")
+    //@PreAuthorize("hasAnyRole('user', 'maintainer')")
+    public void thumbnaildownload(HttpServletResponse response, @RequestParam String filename) {
+        loadFile(response, filename, thumbnailService.load(filename));
+    }
+
+    private void loadFile(HttpServletResponse response, String filename, Resource resource) {
         log.info("Download: {}", filename);
-        final Resource resource = fileService.load(filename);
         var contentType = URLConnection.guessContentTypeFromName(resource.getFilename());
         if (contentType == null) {
             contentType = "application/octet-stream";
@@ -76,27 +85,4 @@ public class FileController {
         }
     }
 
-    @GetMapping("public/thumbnail")
-    //@PreAuthorize("hasAnyRole('user', 'maintainer')")
-    public void thumbnaildownload(HttpServletResponse response, @RequestParam String filename) {
-        log.info("Download: {}", filename);
-        final Resource resource = thumbnailService.load(filename);
-        var contentType = URLConnection.guessContentTypeFromName(resource.getFilename());
-        if (contentType == null) {
-            contentType = "application/octet-stream";
-        }
-        response.setContentType(contentType);
-        response.setHeader(HttpHeaders.CONTENT_DISPOSITION,
-                "attachment; filename=\"" + resource.getFilename() + "\""
-        );
-        try (ServletOutputStream outputStream = response.getOutputStream(); InputStream inputStream = resource.getInputStream()) {
-            response.setContentLengthLong(resource.contentLength());
-            inputStream.transferTo(outputStream);
-            response.setStatus(HttpServletResponse.SC_OK);
-            outputStream.flush();
-        } catch (IOException e) {
-            log.error("File download error for {}: {}", filename, e.getMessage());
-            response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
-        }
-    }
 }
