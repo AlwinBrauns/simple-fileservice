@@ -25,9 +25,12 @@ public class FileController {
     @ResponseStatus(HttpStatus.CREATED)
     @PostMapping("file")
     @PreAuthorize("hasAnyRole('user', 'maintainer')")
-    public void fileupload(@RequestParam("file") MultipartFile file) {
+    public void fileupload(@RequestParam("file") MultipartFile file, @RequestParam(value = "thumbnail", required = false) MultipartFile thumbnail) {
         log.info("Upload: {}", file.getOriginalFilename());
-        fileService.save(file);
+        final var savedFile = fileService.save(file);
+        if(thumbnail != null) {
+            fileService.saveThumbnail(thumbnail, savedFile);
+        }
     }
 
     @ResponseStatus(HttpStatus.OK)

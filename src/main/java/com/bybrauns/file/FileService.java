@@ -1,9 +1,6 @@
 package com.bybrauns.file;
 
-import com.bybrauns.file.filetracking.FileForDeletion;
-import com.bybrauns.file.filetracking.FileForDeletionRepository;
-import com.bybrauns.file.filetracking.FileTracking;
-import com.bybrauns.file.filetracking.FileTrackingRepository;
+import com.bybrauns.file.filetracking.*;
 import jakarta.annotation.PostConstruct;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
@@ -34,8 +31,10 @@ public class FileService {
     private final FileForDeletionRepository fileForDeletionRepository;
     @Value("${files.path}")
     private String filesPath;
+    @Value("${thumbnails.path}")
+    private String thumbnailsPath;
     private final FileTrackingRepository fileTrackingRepository;
-    private final FileForDeletionRepository forDeletionRepository;
+    private final FileThumbnailRepository fileThumbnailRepository;
     Path files;
 
     @PostConstruct
@@ -48,11 +47,21 @@ public class FileService {
         }
     }
 
-    public void save(MultipartFile file) {
+    public FileTracking save(MultipartFile file) {
         try {
             final var fileSearch = fileTrackingRepository.findFirstByFileName(file.getOriginalFilename());
             if(fileSearch.isPresent()) throw new RuntimeException("File already exists!");
-            saveFile(file);
+            return saveFile(file);
+        } catch (IOException e) {
+            throw new RuntimeException(e.getMessage());
+        }
+    }
+
+    public FileTracking saveThumbnail(MultipartFile file) {
+        try {
+            final var fileSearch = fileTrackingRepository.findFirstByFileName(file.getOriginalFilename());
+            if(fileSearch.isPresent()) throw new RuntimeException("File already exists!");
+            return saveThumbnailFile(file);
         } catch (IOException e) {
             throw new RuntimeException(e.getMessage());
         }
@@ -94,12 +103,18 @@ public class FileService {
             final var gotDeleted = Files.deleteIfExists(file);
             if(gotDeleted) {
                 fileTrackingRepository.delete(fileFromTracking);
+                deleteThumbnail(fileFromTracking);
             }
             log.info("File deleted: {}", fileFromTracking.getFileName());
             return gotDeleted;
         } catch (IOException e) {
             throw new RuntimeException("Error: " + e.getMessage());
         }
+    }
+
+    private void deleteThumbnail(FileTracking fileFromTracking) {
+        final var thumbnail = fileThumbnailRepository.findFirstByForFile(fileFromTracking);
+        thumbnail.ifPresent(fileThumbnailRepository::delete);
     }
 
     public void deleteAllMarkedForDeletion() {
@@ -117,15 +132,20 @@ public class FileService {
         return fileSearch.get();
     }
 
-    private void saveFile(MultipartFile file) throws IOException {
+    private FileTracking saveFile(MultipartFile file) throws IOException {
         final var fileTracking = new FileTracking();
-        saveFileAndSaveTracking(file, fileTracking);
+        return saveFileAndSaveTracking(file, fileTracking, filesPath);
     }
 
-    private void saveFileAndSaveTracking(MultipartFile file, FileTracking fileTracking) throws IOException {
+    private FileTracking saveThumbnailFile(MultipartFile file) throws IOException {
+        final var fileTracking = new FileTracking();
+        return saveFileAndSaveTracking(file, fileTracking, thumbnailsPath);
+    }
+
+    private FileTracking saveFileAndSaveTracking(MultipartFile file, FileTracking fileTracking, String basePath) throws IOException {
         final var filename = StringUtils.cleanPath(Objects.requireNonNull(file.getOriginalFilename()));
         fileTracking.setFileName(file.getOriginalFilename());
-        fileTracking.setFilePath(Paths.get(filesPath, filename).normalize().toString());
+        fileTracking.setFilePath(Paths.get(basePath, filename).normalize().toString());
         fileTracking.setFileSize(String.valueOf(file.getSize()));
         fileTracking.setFileType(file.getContentType());
         fileTracking.setTimestamp(Instant.now());
@@ -134,6 +154,15 @@ public class FileService {
                 Objects.requireNonNull(file.getOriginalFilename()))
         );
 
-        fileTrackingRepository.save(fileTracking);
+        return fileTrackingRepository.save(fileTracking);
+    }
+
+    public void saveThumbnail(MultipartFile thumbnail, FileTracking forFile) {
+        if(!Objects.requireNonNull(thumbnail.getContentType()).startsWith("image")) throw new RuntimeException("Thumbnail must be an image!");
+        fileThumbnailRepository.save(FileThumbnail.builder()
+                        .thumbnail(saveThumbnail(thumbnail))
+                        .forFile(forFile)
+                .build()
+        );
     }
 }
