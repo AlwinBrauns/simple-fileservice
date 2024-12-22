@@ -4,7 +4,6 @@ import jakarta.servlet.ServletOutputStream;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.Resource;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -29,6 +28,12 @@ public class FileController {
     public void fileupload(@RequestParam("file") MultipartFile file) {
         log.info("Upload: {}", file.getOriginalFilename());
         fileService.save(file);
+    }
+
+    @ResponseStatus(HttpStatus.OK)
+    @PostMapping("public/clean")
+    public void fileclean() {
+        fileService.deleteAllMarkedForDeletion();
     }
 
     @ResponseStatus(HttpStatus.OK)

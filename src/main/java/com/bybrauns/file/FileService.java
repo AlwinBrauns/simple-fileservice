@@ -7,12 +7,11 @@ import com.bybrauns.file.filetracking.FileTrackingRepository;
 import jakarta.annotation.PostConstruct;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.UrlResource;
 import org.springframework.stereotype.Component;
-import org.springframework.util.FileSystemUtils;
 import org.springframework.util.StringUtils;
 import org.springframework.web.context.annotation.ApplicationScope;
 import org.springframework.web.multipart.MultipartFile;
@@ -24,11 +23,12 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.Instant;
 import java.util.Objects;
-import java.util.stream.Stream;
 
+@Slf4j
 @Component
 @ApplicationScope
 @RequiredArgsConstructor
+@Transactional
 public class FileService {
 
     private final FileForDeletionRepository fileForDeletionRepository;
@@ -48,7 +48,6 @@ public class FileService {
         }
     }
 
-    @Transactional
     public void save(MultipartFile file) {
         try {
             final var fileSearch = fileTrackingRepository.findFirstByFileName(file.getOriginalFilename());
@@ -92,10 +91,24 @@ public class FileService {
         try {
             final var fileFromTracking = getFileTracking(filename);
             Path file = files.resolve(fileFromTracking.getFileName()).normalize();
-            return Files.deleteIfExists(file);
+            final var gotDeleted = Files.deleteIfExists(file);
+            if(gotDeleted) {
+                fileTrackingRepository.delete(fileFromTracking);
+            }
+            log.info("File deleted: {}", fileFromTracking.getFileName());
+            return gotDeleted;
         } catch (IOException e) {
             throw new RuntimeException("Error: " + e.getMessage());
         }
+    }
+
+    public void deleteAllMarkedForDeletion() {
+        final var allMarkedForDeletions = fileForDeletionRepository.findAll();
+        allMarkedForDeletions.forEach(markAsReadyForDeletion -> {
+            if(delete(markAsReadyForDeletion.getFileTracking().getFileName())) {
+                fileForDeletionRepository.delete(markAsReadyForDeletion);
+            }
+        });
     }
 
     private FileTracking getFileTracking(String filename) {
