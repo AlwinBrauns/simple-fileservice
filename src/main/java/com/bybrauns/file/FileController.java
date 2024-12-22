@@ -21,6 +21,7 @@ import java.net.URLConnection;
 public class FileController {
 
     private final FileService fileService;
+    private final ThumbnailService thumbnailService;
 
     @ResponseStatus(HttpStatus.CREATED)
     @PostMapping("file")
@@ -29,7 +30,7 @@ public class FileController {
         log.info("Upload: {}", file.getOriginalFilename());
         final var savedFile = fileService.save(file);
         if(thumbnail != null) {
-            fileService.saveThumbnail(thumbnail, savedFile);
+            thumbnailService.saveThumbnail(thumbnail, savedFile);
         }
     }
 
