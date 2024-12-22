@@ -18,26 +18,25 @@ import java.net.MalformedURLException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.time.Instant;
+import java.util.Objects;
 
 @Slf4j
 @Component
 @ApplicationScope
 @RequiredArgsConstructor
 @Transactional
-public class FileService {
+public class ThumbnailService {
 
-    @Value("${files.path}")
-    private String filesPath;
+    @Value("${thumbnails.path}")
+    private String thumbnailsPath;
     private final FileTrackingRepository fileTrackingRepository;
-    private final FileForDeletionRepository fileForDeletionRepository;
-    private final ThumbnailService thumbnailService;
+    private final FileThumbnailRepository fileThumbnailRepository;
     private final FileTrackingService fileTrackingService;
     Path files;
 
     @PostConstruct
     public void init() {
-        files = Paths.get(filesPath);
+        files = Paths.get(thumbnailsPath);
         try {
             Files.createDirectories(files);
         } catch (IOException e) {
@@ -45,15 +44,12 @@ public class FileService {
         }
     }
 
-    public FileTracking save(MultipartFile file) {
-        return fileTrackingService.save(file, filesPath, files);
-    }
-
     public Resource load(String filename) {
         try {
             filename = StringUtils.cleanPath(filename);
             final var fileFromTracking = fileTrackingService.getFileTracking(filename);
-            Path file = files.resolve("%s/%s".formatted(filesPath, fileFromTracking.getFileName())).normalize();
+            final var thumbnail = fileThumbnailRepository.findFirstByForFile(fileFromTracking).orElseThrow();
+            Path file = files.resolve("%s/%s".formatted(thumbnailsPath, thumbnail.getThumbnail().getFileName())).normalize();
             Resource resource = new UrlResource(file.toUri());
 
             if (resource.exists() || resource.isReadable()) {
@@ -66,28 +62,26 @@ public class FileService {
         }
     }
 
-    public void markAsReadyForDeletion(String filename) {
-        final var fileFromTracking = fileTrackingService.getFileTracking(filename);
-        if(fileForDeletionRepository.findFirstByFileTracking(fileFromTracking).isPresent())
-            throw new RuntimeException("File already marked for deletion!");
-        fileForDeletionRepository.save(
-                FileForDeletion.builder()
-                        .fileTracking(fileFromTracking)
-                        .timestamp(Instant.now())
+    public void save(MultipartFile thumbnail, FileTracking forFile) {
+        if(!Objects.requireNonNull(thumbnail.getContentType()).startsWith("image")) throw new RuntimeException("Thumbnail must be an image!");
+        fileThumbnailRepository.save(FileThumbnail.builder()
+                .thumbnail(save(thumbnail))
+                .forFile(forFile)
                 .build()
         );
     }
 
-    public void deleteAllMarkedForDeletion() {
-        final var allMarkedForDeletions = fileForDeletionRepository.findAll();
-        allMarkedForDeletions.forEach(markAsReadyForDeletion -> {
-            if(fileTrackingService.delete(markAsReadyForDeletion.getFileTracking().getFileName(), files)) {
-                fileForDeletionRepository.delete(markAsReadyForDeletion);
+    private FileTracking save(MultipartFile file) {
+        return fileTrackingService.save(file, thumbnailsPath, files);
+    }
+
+    public void deleteThumbnail(FileTracking fileFromTracking) {
+        final var thumbnail = fileThumbnailRepository.findFirstByForFile(fileFromTracking);
+        thumbnail.ifPresent(_thumbnail -> {
+            if(fileTrackingService.delete(_thumbnail.getThumbnail().getFileName(), files)) {
+                fileThumbnailRepository.delete(_thumbnail);
             }
         });
     }
 
-    public boolean delete(String filename) {
-        return fileTrackingService.delete(filename, files);
-    }
 }

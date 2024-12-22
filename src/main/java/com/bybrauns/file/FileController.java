@@ -21,13 +21,17 @@ import java.net.URLConnection;
 public class FileController {
 
     private final FileService fileService;
+    private final ThumbnailService thumbnailService;
 
     @ResponseStatus(HttpStatus.CREATED)
     @PostMapping("file")
     @PreAuthorize("hasAnyRole('user', 'maintainer')")
-    public void fileupload(@RequestParam("file") MultipartFile file) {
+    public void fileupload(@RequestParam("file") MultipartFile file, @RequestParam(value = "thumbnail", required = false) MultipartFile thumbnail) {
         log.info("Upload: {}", file.getOriginalFilename());
-        fileService.save(file);
+        final var savedFile = fileService.save(file);
+        if(thumbnail != null) {
+            thumbnailService.save(thumbnail, savedFile);
+        }
     }
 
     @ResponseStatus(HttpStatus.OK)
@@ -51,8 +55,17 @@ public class FileController {
     @GetMapping("public/file")
     //@PreAuthorize("hasAnyRole('user', 'maintainer')")
     public void filedownload(HttpServletResponse response, @RequestParam String filename) {
+        loadFile(response, filename, fileService.load(filename));
+    }
+
+    @GetMapping("public/thumbnail")
+    //@PreAuthorize("hasAnyRole('user', 'maintainer')")
+    public void thumbnaildownload(HttpServletResponse response, @RequestParam String filename) {
+        loadFile(response, filename, thumbnailService.load(filename));
+    }
+
+    private void loadFile(HttpServletResponse response, String filename, Resource resource) {
         log.info("Download: {}", filename);
-        final Resource resource = fileService.load(filename);
         var contentType = URLConnection.guessContentTypeFromName(resource.getFilename());
         if (contentType == null) {
             contentType = "application/octet-stream";
@@ -71,4 +84,5 @@ public class FileController {
             response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
         }
     }
+
 }
