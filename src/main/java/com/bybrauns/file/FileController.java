@@ -75,4 +75,28 @@ public class FileController {
             response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
         }
     }
+
+    @GetMapping("public/thumbnail")
+    //@PreAuthorize("hasAnyRole('user', 'maintainer')")
+    public void thumbnaildownload(HttpServletResponse response, @RequestParam String filename) {
+        log.info("Download: {}", filename);
+        final Resource resource = thumbnailService.load(filename);
+        var contentType = URLConnection.guessContentTypeFromName(resource.getFilename());
+        if (contentType == null) {
+            contentType = "application/octet-stream";
+        }
+        response.setContentType(contentType);
+        response.setHeader(HttpHeaders.CONTENT_DISPOSITION,
+                "attachment; filename=\"" + resource.getFilename() + "\""
+        );
+        try (ServletOutputStream outputStream = response.getOutputStream(); InputStream inputStream = resource.getInputStream()) {
+            response.setContentLengthLong(resource.contentLength());
+            inputStream.transferTo(outputStream);
+            response.setStatus(HttpServletResponse.SC_OK);
+            outputStream.flush();
+        } catch (IOException e) {
+            log.error("File download error for {}: {}", filename, e.getMessage());
+            response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
+        }
+    }
 }

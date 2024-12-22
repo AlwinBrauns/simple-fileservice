@@ -6,11 +6,15 @@ import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.io.Resource;
+import org.springframework.core.io.UrlResource;
 import org.springframework.stereotype.Component;
+import org.springframework.util.StringUtils;
 import org.springframework.web.context.annotation.ApplicationScope;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
+import java.net.MalformedURLException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -38,6 +42,30 @@ public class ThumbnailService {
         } catch (IOException e) {
             throw new RuntimeException("Could not initialize folder for upload!");
         }
+    }
+
+    public Resource load(String filename) {
+        try {
+            filename = StringUtils.cleanPath(filename);
+            final var fileFromTracking = getFileTracking(filename);
+            final var thumbnail = fileThumbnailRepository.findFirstByForFile(fileFromTracking).orElseThrow();
+            Path file = files.resolve("%s/%s".formatted(thumbnailsPath, thumbnail.getThumbnail().getFileName())).normalize();
+            Resource resource = new UrlResource(file.toUri());
+
+            if (resource.exists() || resource.isReadable()) {
+                return resource;
+            } else {
+                throw new RuntimeException("Could not read the file!");
+            }
+        } catch (MalformedURLException e) {
+            throw new RuntimeException("Error: " + e.getMessage());
+        }
+    }
+
+    private FileTracking getFileTracking(String filename) {
+        final var fileSearch = fileTrackingRepository.findFirstByFileName(filename);
+        if(fileSearch.isEmpty()) throw new RuntimeException("File not found!");
+        return fileSearch.get();
     }
 
     public void saveThumbnail(MultipartFile thumbnail, FileTracking forFile) {
