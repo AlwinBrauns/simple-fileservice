@@ -8,12 +8,16 @@ import org.springframework.core.io.Resource;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URLConnection;
+import java.security.Principal;
 
 @RestController
 @Slf4j
@@ -25,9 +29,8 @@ public class FileController {
 
     @ResponseStatus(HttpStatus.CREATED)
     @PostMapping("file")
-    @PreAuthorize("hasAnyRole('user', 'maintainer')")
-    public void fileupload(@RequestParam("file") MultipartFile file, @RequestParam(value = "thumbnail", required = false) MultipartFile thumbnail) {
-        log.info("Upload: {}", file.getOriginalFilename());
+    @PreAuthorize("hasAnyRole('maintainer')")
+    public void fileupload(Principal principal, @RequestParam("file") MultipartFile file, @RequestParam(value = "thumbnail", required = false) MultipartFile thumbnail) {
         final var savedFile = fileService.save(file);
         if(thumbnail != null) {
             thumbnailService.save(thumbnail, savedFile);
@@ -35,14 +38,15 @@ public class FileController {
     }
 
     @ResponseStatus(HttpStatus.OK)
-    @PostMapping("public/clean")
+    @PostMapping("clean")
+    @PreAuthorize("hasAnyRole('maintainer')")
     public void fileclean() {
         fileService.deleteAllMarkedForDeletion();
     }
 
     @ResponseStatus(HttpStatus.OK)
-    @DeleteMapping("public/file")
-    //@PreAuthorize("hasAnyRole('user', 'maintainer')")
+    @DeleteMapping("file")
+    @PreAuthorize("hasAnyRole('maintainer')")
     public void filedeletion(@RequestParam String filename, @RequestParam(required = false) boolean instant) {
         log.info("Deleting: {}", filename);
         if (instant) {
@@ -52,14 +56,14 @@ public class FileController {
         }
     }
 
-    @GetMapping("public/file")
-    //@PreAuthorize("hasAnyRole('user', 'maintainer')")
+    @GetMapping("file")
+    @PreAuthorize("hasAnyRole('maintainer')")
     public void filedownload(HttpServletResponse response, @RequestParam String filename) {
         loadFile(response, filename, fileService.load(filename));
     }
 
-    @GetMapping("public/thumbnail")
-    //@PreAuthorize("hasAnyRole('user', 'maintainer')")
+    @GetMapping("thumbnail")
+    @PreAuthorize("hasAnyRole('maintainer')")
     public void thumbnaildownload(HttpServletResponse response, @RequestParam String filename) {
         loadFile(response, filename, thumbnailService.load(filename));
     }
