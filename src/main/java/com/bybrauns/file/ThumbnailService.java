@@ -44,12 +44,12 @@ public class ThumbnailService {
         }
     }
 
-    public Resource load(String filename) {
+    public Resource load(String filename, String userName) {
         try {
             filename = StringUtils.cleanPath(filename);
-            final var fileFromTracking = fileTrackingService.getFileTracking(filename);
+            final var fileFromTracking = fileTrackingService.getFileTracking(filename, userName);
             final var thumbnail = fileThumbnailRepository.findFirstByForFile(fileFromTracking).orElseThrow();
-            Path file = files.resolve("%s/%s".formatted(thumbnailsPath, thumbnail.getThumbnail().getFileName())).normalize();
+            Path file = files.resolve("%s/%s/%s".formatted(thumbnailsPath, userName, thumbnail.getThumbnail().getFileName())).normalize();
             Resource resource = new UrlResource(file.toUri());
 
             if (resource.exists() || resource.isReadable()) {
@@ -62,23 +62,23 @@ public class ThumbnailService {
         }
     }
 
-    public void save(MultipartFile thumbnail, FileTracking forFile) {
+    public void save(MultipartFile thumbnail, FileTracking forFile, String userName) {
         if(!Objects.requireNonNull(thumbnail.getContentType()).startsWith("image")) throw new RuntimeException("Thumbnail must be an image!");
         fileThumbnailRepository.save(FileThumbnail.builder()
-                .thumbnail(save(thumbnail))
+                .thumbnail(save(thumbnail, userName))
                 .forFile(forFile)
                 .build()
         );
     }
 
-    private FileTracking save(MultipartFile file) {
-        return fileTrackingService.save(file, thumbnailsPath, files);
+    private FileTracking save(MultipartFile file, String userName) {
+        return fileTrackingService.save(file, thumbnailsPath, files, userName);
     }
 
     public void deleteThumbnail(FileTracking fileFromTracking) {
         final var thumbnail = fileThumbnailRepository.findFirstByForFile(fileFromTracking);
         thumbnail.ifPresent(_thumbnail -> {
-            if(fileTrackingService.delete(_thumbnail.getThumbnail().getFileName(), files)) {
+            if(fileTrackingService.delete(_thumbnail.getThumbnail().getFileName(), files, _thumbnail.getThumbnail().getCreatedBy())) {
                 fileThumbnailRepository.delete(_thumbnail);
             }
         });

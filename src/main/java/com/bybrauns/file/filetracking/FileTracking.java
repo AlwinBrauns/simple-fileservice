@@ -24,5 +24,6 @@ public class FileTracking {
     private String fileType;
     private String fileSize;
     private Instant timestamp;
+    private String createdBy;
 
 }

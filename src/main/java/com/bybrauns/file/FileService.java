@@ -29,9 +29,7 @@ public class FileService {
 
     @Value("${files.path}")
     private String filesPath;
-    private final FileTrackingRepository fileTrackingRepository;
     private final FileForDeletionRepository fileForDeletionRepository;
-    private final ThumbnailService thumbnailService;
     private final FileTrackingService fileTrackingService;
     Path files;
 
@@ -45,15 +43,15 @@ public class FileService {
         }
     }
 
-    public FileTracking save(MultipartFile file) {
-        return fileTrackingService.save(file, filesPath, files);
+    public FileTracking save(MultipartFile file, String userName) {
+        return fileTrackingService.save(file, filesPath, files, userName);
     }
 
-    public Resource load(String filename) {
+    public Resource load(String filename, String userName) {
         try {
             filename = StringUtils.cleanPath(filename);
-            final var fileFromTracking = fileTrackingService.getFileTracking(filename);
-            Path file = files.resolve("%s/%s".formatted(filesPath, fileFromTracking.getFileName())).normalize();
+            final var fileFromTracking = fileTrackingService.getFileTracking(filename, userName);
+            Path file = files.resolve("%s/%s/%s".formatted(filesPath, userName, fileFromTracking.getFileName())).normalize();
             Resource resource = new UrlResource(file.toUri());
 
             if (resource.exists() || resource.isReadable()) {
@@ -66,8 +64,8 @@ public class FileService {
         }
     }
 
-    public void markAsReadyForDeletion(String filename) {
-        final var fileFromTracking = fileTrackingService.getFileTracking(filename);
+    public void markAsReadyForDeletion(String filename, String userName) {
+        final var fileFromTracking = fileTrackingService.getFileTracking(filename, userName);
         if(fileForDeletionRepository.findFirstByFileTracking(fileFromTracking).isPresent())
             throw new RuntimeException("File already marked for deletion!");
         fileForDeletionRepository.save(
@@ -81,13 +79,13 @@ public class FileService {
     public void deleteAllMarkedForDeletion() {
         final var allMarkedForDeletions = fileForDeletionRepository.findAll();
         allMarkedForDeletions.forEach(markAsReadyForDeletion -> {
-            if(fileTrackingService.delete(markAsReadyForDeletion.getFileTracking().getFileName(), files)) {
+            if(fileTrackingService.delete(markAsReadyForDeletion.getFileTracking().getFileName(), files, markAsReadyForDeletion.getFileTracking().getCreatedBy())) {
                 fileForDeletionRepository.delete(markAsReadyForDeletion);
             }
         });
     }
 
-    public boolean delete(String filename) {
-        return fileTrackingService.delete(filename, files);
+    public boolean delete(String filename, String userName) {
+        return fileTrackingService.delete(filename, files, userName);
     }
 }

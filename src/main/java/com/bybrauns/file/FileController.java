@@ -8,10 +8,7 @@ import org.springframework.core.io.Resource;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
@@ -31,9 +28,9 @@ public class FileController {
     @PostMapping("file")
     @PreAuthorize("hasAnyRole('maintainer')")
     public void fileupload(Principal principal, @RequestParam("file") MultipartFile file, @RequestParam(value = "thumbnail", required = false) MultipartFile thumbnail) {
-        final var savedFile = fileService.save(file);
+        final var savedFile = fileService.save(file, principal.getName());
         if(thumbnail != null) {
-            thumbnailService.save(thumbnail, savedFile);
+            thumbnailService.save(thumbnail, savedFile, principal.getName());
         }
     }
 
@@ -47,25 +44,27 @@ public class FileController {
     @ResponseStatus(HttpStatus.OK)
     @DeleteMapping("file")
     @PreAuthorize("hasAnyRole('maintainer')")
-    public void filedeletion(@RequestParam String filename, @RequestParam(required = false) boolean instant) {
+    public void filedeletion(Principal principal, @RequestParam String filename, @RequestParam(required = false) boolean instant) {
         log.info("Deleting: {}", filename);
         if (instant) {
-            fileService.delete(filename);
+            if(!fileService.delete(filename, principal.getName())) {
+                throw new RuntimeException("Could not delete file: " + filename);
+            }
         } else {
-            fileService.markAsReadyForDeletion(filename);
+            fileService.markAsReadyForDeletion(filename, principal.getName());
         }
     }
 
     @GetMapping("file")
     @PreAuthorize("hasAnyRole('maintainer')")
-    public void filedownload(HttpServletResponse response, @RequestParam String filename) {
-        loadFile(response, filename, fileService.load(filename));
+    public void filedownload(Principal principal, HttpServletResponse response, @RequestParam String filename) {
+        loadFile(response, filename, fileService.load(filename, principal.getName()));
     }
 
     @GetMapping("thumbnail")
     @PreAuthorize("hasAnyRole('maintainer')")
-    public void thumbnaildownload(HttpServletResponse response, @RequestParam String filename) {
-        loadFile(response, filename, thumbnailService.load(filename));
+    public void thumbnaildownload(Principal principal, HttpServletResponse response, @RequestParam String filename) {
+        loadFile(response, filename, thumbnailService.load(filename, principal.getName()));
     }
 
     private void loadFile(HttpServletResponse response, String filename, Resource resource) {

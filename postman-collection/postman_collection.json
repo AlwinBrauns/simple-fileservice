@@ -1,0 +1,215 @@
+{
+	"info": {
+		"_postman_id": "8c9b60c8-71b3-4f33-80fb-cac222fd2a9a",
+		"name": "Spring File Server API",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "14123847"
+	},
+	"item": [
+		{
+			"name": "Datei hochladen",
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "formdata",
+					"formdata": [
+						{
+							"key": "file",
+							"type": "file",
+							"src": ""
+						},
+						{
+							"key": "thumbnail",
+							"type": "file",
+							"src": ""
+						}
+					]
+				},
+				"url": {
+					"raw": "{{baseUrl}}/file",
+					"host": [
+						"{{baseUrl}}"
+					],
+					"path": [
+						"file"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Datei herunterladen",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "{{baseUrl}}/file?filename=postman_collection.json",
+					"host": [
+						"{{baseUrl}}"
+					],
+					"path": [
+						"file"
+					],
+					"query": [
+						{
+							"key": "filename",
+							"value": "postman_collection.json",
+							"description": "Dateiname"
+						}
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Datei zur Löschung markieren",
+			"request": {
+				"method": "DELETE",
+				"header": [],
+				"url": {
+					"raw": "{{baseUrl}}/file?filename=postman_collection.json",
+					"host": [
+						"{{baseUrl}}"
+					],
+					"path": [
+						"file"
+					],
+					"query": [
+						{
+							"key": "filename",
+							"value": "postman_collection.json",
+							"description": "Dateiname"
+						}
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Alle markierten Dateien löschen",
+			"request": {
+				"method": "POST",
+				"header": [],
+				"url": {
+					"raw": "{{baseUrl}}/clean",
+					"host": [
+						"{{baseUrl}}"
+					],
+					"path": [
+						"clean"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Thumbnail herunterladen",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "{{baseUrl}}/thumbnail?filename=postman_collection.json",
+					"host": [
+						"{{baseUrl}}"
+					],
+					"path": [
+						"thumbnail"
+					],
+					"query": [
+						{
+							"key": "filename",
+							"value": "postman_collection.json",
+							"description": "Thumbnail Name"
+						}
+					]
+				}
+			},
+			"response": []
+		}
+	],
+	"auth": {
+		"type": "oauth2",
+		"oauth2": [
+			{
+				"key": "redirect_uri",
+				"value": "https://dev.bybrauns.com",
+				"type": "string"
+			},
+			{
+				"key": "useBrowser",
+				"value": false,
+				"type": "boolean"
+			},
+			{
+				"key": "grant_type",
+				"value": "authorization_code_with_pkce",
+				"type": "string"
+			},
+			{
+				"key": "grantType",
+				"value": "authorization_code",
+				"type": "string"
+			},
+			{
+				"key": "accessTokenUrl",
+				"value": "https://auth.bybrauns.com/realms/bybrauns/protocol/openid-connect/token",
+				"type": "string"
+			},
+			{
+				"key": "authUrl",
+				"value": "https://auth.bybrauns.com/realms/bybrauns/protocol/openid-connect/auth",
+				"type": "string"
+			},
+			{
+				"key": "clientId",
+				"value": "dev-bybrauns",
+				"type": "string"
+			},
+			{
+				"key": "addTokenTo",
+				"value": "header",
+				"type": "string"
+			},
+			{
+				"key": "tokenName",
+				"value": "Authorization",
+				"type": "string"
+			},
+			{
+				"key": "headerPrefix",
+				"value": "Bearer",
+				"type": "string"
+			}
+		]
+	},
+	"event": [
+		{
+			"listen": "prerequest",
+			"script": {
+				"type": "text/javascript",
+				"packages": {},
+				"exec": [
+					""
+				]
+			}
+		},
+		{
+			"listen": "test",
+			"script": {
+				"type": "text/javascript",
+				"packages": {},
+				"exec": [
+					""
+				]
+			}
+		}
+	],
+	"variable": [
+		{
+			"key": "baseUrl",
+			"value": "http://localhost:8080",
+			"type": "string"
+		}
+	]
+}
